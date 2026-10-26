@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#14122b">
+<title>DreamSpace — 3D World Builder</title>
+<style>
+:root{--bg:#14122b;--pn:#1e1b3f;--pn2:#2a2657;--tx:#f3f1ff;--mu:#a9a4d6;--ln:#3a3570;--ac:#7c5cff;--ac2:#ff5fa2;--ok:#3de0b5;--er:#ff6b6b;--grad:linear-gradient(135deg,#7c5cff,#ff5fa2)}
+[data-theme=light]{--bg:#f4f2ff;--pn:#fff;--pn2:#ebe7ff;--tx:#1d1a3a;--mu:#5d5890;--ln:#d5cfff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none;background:var(--bg);color:var(--tx);font:14px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#app{height:100%;display:grid;grid-template-rows:54px 1fr 64px;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header{display:flex;align-items:center;gap:6px;padding:0 8px;background:var(--pn);border-bottom:1px solid var(--ln)}
+.logo{font-weight:800;font-size:18px;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;margin-right:2px}
+#wname{flex:1;min-width:0;background:transparent;border:1px solid transparent;color:var(--tx);font-weight:600;padding:8px;border-radius:10px}
+#wname:focus{border-color:var(--ac);outline:none}
+button,select{font:inherit;color:var(--tx);background:var(--pn2);border:1px solid var(--ln);border-radius:12px;min-height:44px;min-width:44px;padding:0 12px;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--ok);outline-offset:1px}
+button:active{transform:scale(.96)}
+button.on,button.pri{background:var(--grad);border-color:transparent;color:#fff;font-weight:700}
+#vp{position:relative;min-height:0;overflow:hidden}
+#vp canvas{display:block;width:100%;height:100%;touch-action:none}
+#st{position:absolute;left:8px;right:8px;top:8px;display:flex;gap:6px;flex-wrap:wrap;pointer-events:none;font-size:12px}
+#st span{background:#14122bcc;color:#f3f1ff;border-radius:99px;padding:4px 10px}
+#bar{display:flex;gap:6px;align-items:center;overflow-x:auto;padding:8px;background:var(--pn);border-top:1px solid var(--ln)}
+#bar button{flex:none}#bar i{flex:none;width:1px;height:28px;background:var(--ln)}
+.panel{display:none;position:fixed;left:0;right:0;bottom:calc(64px + env(safe-area-inset-bottom));max-height:50vh;overflow:auto;background:var(--pn);border-top:2px solid var(--ac);padding:10px;z-index:5}
+.panel.open{display:block}
+h3{margin:12px 0 6px;font-size:13px;color:var(--mu)}h3:first-child{margin-top:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:6px}
+.grid button{font-size:13px;padding:6px}
+input[type=text],input[type=search],input[type=number]{width:100%;min-height:40px;background:var(--bg);color:var(--tx);border:1px solid var(--ln);border-radius:10px;padding:0 8px}
+.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.row3 label{font-size:11px;color:var(--mu)}
+input[type=color]{width:100%;height:44px;border:1px solid var(--ln);border-radius:10px;background:none;padding:2px}
+.hi{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:10px;cursor:pointer;min-height:44px}
+.hi b{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hi.sel{background:var(--pn2);outline:2px solid var(--ac)}.hi button{min-height:36px}
+.empty{color:var(--mu);padding:8px 0}
+#menu{display:none;position:fixed;right:8px;top:calc(58px + env(safe-area-inset-top));z-index:9;background:var(--pn);border:1px solid var(--ln);border-radius:14px;padding:6px;flex-direction:column;gap:4px;min-width:190px}
+#menu.open{display:flex}#menu button{text-align:left}
+#toast,#err{position:fixed;left:50%;transform:translateX(-50%);z-index:20;border-radius:12px;padding:10px 14px;max-width:92vw}
+#toast{bottom:84px;background:var(--tx);color:var(--bg);display:none}
+#err{top:60px;background:var(--er);color:#fff;display:none;font-weight:600}
+dialog{background:var(--pn);color:var(--tx);border:1px solid var(--ln);border-radius:16px;max-width:92vw;width:380px}
+dialog::backdrop{background:#000a}
+dialog label{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0}
+@media(min-width:900px){
+#app{grid-template-columns:260px 1fr 280px;grid-template-rows:54px 1fr 64px}
+header,#bar{grid-column:1/4}
+.panel{display:block;position:static;max-height:none;border:0;border-right:1px solid var(--ln)}
+#insp{border-right:0;border-left:1px solid var(--ln)}
+.mob{display:none}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<script>
+/* Visible error handling (classic script so it works even if modules fail) */
+function dsErr(m){var e=document.getElementById('err');if(e){e.textContent=m;e.style.display='block'}}
+window.addEventListener('error',function(ev){dsErr('Something went wrong: '+(ev.message||'script error')+'. Check your internet connection and reload.')});
+window.addEventListener('unhandledrejection',function(ev){dsErr('Problem: '+(ev.reason&&ev.reason.message||ev.reason))});
+setTimeout(function(){if(!window.__ds)dsErr('DreamSpace could not load Three.js (internet or CDN problem). Reload the page.')},8000);
+</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="err" role="alert"></div><div id="toast" role="status"></div>
+<div id="app">
+<header>
+ <span class="logo">DreamSpace</span>
+ <input id="wname" value="My first world" maxlength="40" aria-label="World name">
+ <button data-act="save" class="pri" aria-label="Save">Save</button>
+ <button data-act="undo" aria-label="Undo">↶</button>
+ <button data-act="redo" aria-label="Redo">↷</button>
+ <button data-act="menu" aria-label="Menu">☰</button>
+</header>
+<div id="menu">
+ <button data-act="new">New world</button><button data-act="clear">Clear world</button>
+ <button data-act="export">Export JSON</button><button data-act="import">Import JSON</button>
+ <button data-act="shot">Screenshot</button><button data-act="settings">World settings</button>
+ <button data-act="theme">Light / dark theme</button><button data-act="help">Help</button>
+</div>
+<input type="file" id="file" accept=".json,application/json" hidden>
+<aside class="panel" id="lib">
+ <h3>Add to your world</h3>
+ <input type="search" id="q" placeholder="Search objects…" aria-label="Search objects">
+ <div id="libgrid"></div>
+ <h3>Scene objects</h3><div id="hier"></div>
+</aside>
+<main id="vp"><div id="st"></div></main>
+<aside class="panel" id="insp">
+ <div id="iempty" class="empty">Tap an object in the world or the list to edit it.</div>
+ <div id="iform" hidden>
+  <h3>General</h3>
+  <input type="text" id="iname" aria-label="Object name" maxlength="40">
+  <div class="empty" id="itype"></div>
+  <h3>Position</h3><div class="row3" id="pos"></div>
+  <h3>Rotation (degrees)</h3><div class="row3" id="rot"></div>
+  <h3>Scale</h3><div class="row3" id="scl"></div>
+  <h3>Colour</h3><input type="color" id="icol" aria-label="Colour">
+ </div>
+</aside>
+<nav id="bar" aria-label="Tools">
+ <button data-act="libt" class="mob">Library</button><button data-act="inspt" class="mob">Inspector</button><i class="mob"></i>
+ <button data-tool="select" class="on">Select</button><button data-tool="translate">Move</button><button data-tool="rotate">Rotate</button><button data-tool="scale">Scale</button><i></i>
+ <button data-act="dup">Duplicate</button><button data-act="reset">Reset</button><button data-act="del">Delete</button><button data-act="desel">Deselect</button><i></i>
+ <button data-act="cam">Reset cam</button><button data-act="top">Top</button><button data-act="front">Front</button><button data-act="side">Side</button><button data-act="zin">Zoom +</button><button data-act="zout">Zoom −</button><button data-act="focus">Focus</button>
+</nav>
+</div>
+<dialog id="dS"><form method="dialog"><h3>World settings</h3>
+ <label>Sky colour<input type="color" id="sSky"></label>
+ <label>Ground colour<input type="color" id="sGnd"></label>
+ <label>Show grid<input type="checkbox" id="sGrid"></label>
+ <label>Shadows<input type="checkbox" id="sShadow"></label>
+ <label>Light<input type="range" id="sLight" min="0.2" max="2" step="0.1"></label>
+ <button class="pri">Done</button></form></dialog>
+<dialog id="dH"><form method="dialog"><h3>How to use DreamSpace</h3>
+ <p>Drag to orbit, pinch or scroll to zoom. Tap an object to select it. Use Move, Rotate or Scale, then drag the coloured handles. Edit exact numbers in the Inspector. Everything autosaves in this browser; use Export JSON for a backup file.</p>
+ <p>Undo / Redo cover add, delete, duplicate, transforms, colour, rename, visibility, clear and settings changes made through those controls.</p>
+ <button class="pri">Got it</button></form></dialog>
+
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {TransformControls} from 'three/addons/controls/TransformControls.js';
+const $=id=>document.getElementById(id),K='dreamspace.v1';
+const box=(w,h,d)=>new THREE.BoxGeometry(w,h,d),cyl=(a,b,h,s=10)=>new THREE.CylinderGeometry(a,b,h,s),cone=(r,h,s=8)=>new THREE.ConeGeometry(r,h,s),sph=r=>new THREE.SphereGeometry(r,14,10);
+/* Object library: [category,label,icon,colour,builder(M,C)]. M(geo,colour,x,y,z,tinted) */
+const T={
+house:['Buildings','House','🏠',0xf0e6d3,(M,C)=>{M(box(3,1.8,2.6),C,0,.9,0,1);M(cone(2.15,1.25,4),0x9c5a49,0,2.4,0).rotation.y=Math.PI/4;M(box(.6,1.1,.08),0x8d6749,0,.55,1.32);M(box(.55,.5,.08),0x579bc8,-.9,1.1,1.32);M(box(.55,.5,.08),0x579bc8,.9,1.1,1.32)}],
+modern:['Buildings','Modern house','🏡',0xe8edf2,(M,C)=>{M(box(3.2,1.4,2.4),C,0,.7,0,1);M(box(2,1.2,2.2),C,-.5,2,0,1);M(box(2.6,.5,.06),0x4aa3df,0,.8,1.22);M(box(1.6,.5,.06),0x4aa3df,-.5,2,1.12)}],
+building:['Buildings','Building','🏢',0x9fb4c8,(M,C)=>{M(box(2.4,5,2.4),C,0,2.5,0,1);for(let i=0;i<4;i++)M(box(2.5,.3,2.5),0x4a6a8a,0,.9+i*1.1,0)}],
+tower:['Buildings','Tower','🗼',0xd9c6a0,(M,C)=>{M(cyl(.9,1.1,5),C,0,2.5,0,1);M(cone(1.3,1.4),0xb5523b,0,5.7,0)}],
+tree:['Nature','Tree','🌳',0x3f8054,(M,C)=>{M(cyl(.16,.22,1.5),0x8d6749,0,.75,0);M(sph(1),C,0,2.2,0,1)}],
+pine:['Nature','Pine tree','🌲',0x2d6a4f,(M,C)=>{M(cyl(.14,.2,1.2),0x6b4a32,0,.6,0);M(cone(1,1.6),C,0,1.8,0,1);M(cone(.75,1.4),C,0,2.7,0,1);M(cone(.5,1.1),C,0,3.5,0,1)}],
+bush:['Nature','Bush','🌿',0x4f9d5a,(M,C)=>{M(sph(.6),C,0,.5,0,1);M(sph(.45),C,.6,.35,.2,1);M(sph(.4),C,-.55,.3,-.1,1)}],
+rock:['Nature','Rock','🪨',0x8b99a7,(M,C)=>{M(new THREE.DodecahedronGeometry(.75,0),C,0,.5,0,1).scale.set(1.2,.8,1)}],
+flower:['Nature','Flower','🌸',0xff6fa5,(M,C)=>{M(cyl(.03,.03,.7,6),0x3f8054,0,.35,0);M(sph(.2),C,0,.8,0,1);M(sph(.08),0xffd166,0,.95,0)}],
+cube:['Objects','Cube','🧊',0x6c8cff,(M,C)=>M(box(1,1,1),C,0,.5,0,1)],
+sphere:['Objects','Sphere','🔮',0xff8a5c,(M,C)=>M(sph(.6),C,0,.6,0,1)],
+cylinder:['Objects','Cylinder','🥫',0x3de0b5,(M,C)=>M(cyl(.5,.5,1.2,20),C,0,.6,0,1)],
+lamp:['Objects','Lamp','💡',0xffe9a6,(M,C)=>{M(cyl(.07,.1,2.3),0x43556e,0,1.15,0);M(sph(.26),C,0,2.4,0,1)}],
+bench:['Objects','Bench','🪑',0x8d6749,(M,C)=>{M(box(1.8,.16,.55),C,0,.65,0,1);M(box(1.8,.55,.1),C,0,.95,-.22,1);for(const x of[-.7,.7])M(box(.1,.65,.1),0x43556e,x,.32,0)}],
+platform:['Environment','Platform','⬛',0xb8c0cc,(M,C)=>M(box(4,.2,4),C,0,.1,0,1)],
+path:['Environment','Path','🛤️',0xcdb891,(M,C)=>M(box(1.4,.06,5),C,0,.03,0,1)],
+fence:['Environment','Fence','🚧',0xc08a5a,(M,C)=>{for(let i=-2;i<=2;i++)M(box(.12,1,.12),C,i*.5,.5,0,1);M(box(2.2,.1,.06),C,0,.8,0,1);M(box(2.2,.1,.06),C,0,.45,0,1)}],
+water:['Environment','Water','🌊',0x3fa7e0,(M,C)=>{const m=M(box(5,.05,5),C,0,.04,0,1);m.material.transparent=true;m.material.opacity=.7}]
+};
+const S={objs:[],sel:null,tool:'select',n:0,dirty:false,undo:[],redo:[],set:{sky:'#bfe3ff',gnd:'#8fc27e',grid:true,light:1,shadow:true}};
+let scene,camera,renderer,controls,tc,ground,grid,hemi,sun,outline;
+function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',2200)}
+function init(){
+ const vp=$('vp');
+ try{renderer=new THREE.WebGLRenderer({antialias:true})}catch(e){throw new Error('Your browser could not start WebGL (3D graphics).')}
+ renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;vp.prepend(renderer.domElement);
+ scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(55,1,.1,300);camera.position.set(11,9,13);
+ controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.maxPolarAngle=Math.PI*.49;controls.minDistance=3;controls.maxDistance=45;
+ hemi=new THREE.HemisphereLight(0xffffff,0x7a86a8,1.6);scene.add(hemi);
+ sun=new THREE.DirectionalLight(0xfff0d6,2.4);sun.position.set(-8,15,8);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-20,right:20,top:20,bottom:-20});scene.add(sun);
+ ground=new THREE.Mesh(new THREE.PlaneGeometry(80,80),new THREE.MeshStandardMaterial({roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+ grid=new THREE.GridHelper(40,40,0x55507f,0x7a76a8);grid.position.y=.01;scene.add(grid);
+ outline=new THREE.BoxHelper(new THREE.Object3D(),0xffd166);outline.visible=false;scene.add(outline);
+ tc=new TransformControls(camera,renderer.domElement);tc.size=1.1;scene.add(tc);
+ tc.addEventListener('dragging-changed',e=>{controls.enabled=!e.value;tc.busy=e.value;if(e.value)pushHist();else{tc.last=Date.now();markDirty()}});
+ tc.addEventListener('objectChange',refreshInsp);
+ new ResizeObserver(()=>{const w=vp.clientWidth,h=vp.clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false)}).observe(vp);
+ pick();applySet();
+ renderer.setAnimationLoop(()=>{controls.update();if(S.sel&&outline.visible)outline.setFromObject(S.sel);renderer.render(scene,camera)});
+}
+/* ---- objects ---- */
+function build(type,id){
+ const [,label,,C,fn]=T[type],g=new THREE.Group(),tint=[];
+ const M=(geo,col,x,y,z,t)=>{const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:col,roughness:.8}));m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;g.add(m);if(t)tint.push(m);return m};
+ fn(M,C);g.name=label;g.userData={id,type,tint,color:'#'+new THREE.Color(C).getHexString()};return g}
+function addObj(type,d){
+ const id=d&&d.id||'o'+(++S.n),g=build(type,id);
+ if(d){g.name=d.name;g.position.fromArray(d.p);g.rotation.set(d.r[0],d.r[1],d.r[2]);g.scale.fromArray(d.s).max(new THREE.Vector3(.05,.05,.05));g.visible=d.visible!==false;paint(g,d.color)}
+ else{const k=S.objs.length;g.position.set(controls.target.x+((k%4)-1.5)*2.4,0,controls.target.z+(Math.floor(k/4)%3)*2.4-1)}
+ scene.add(g);S.objs.push(g);return g}
+function paint(g,hex){if(!/^#[0-9a-f]{6}$/i.test(hex))return;g.userData.color=hex;g.userData.tint.forEach(m=>m.material.color.set(hex))}
+function drop(g){if(S.sel===g)select(null);scene.remove(g);g.traverse(o=>{if(o.isMesh){o.geometry.dispose();o.material.dispose()}});S.objs.splice(S.objs.indexOf(g),1)}
+function snap(){return JSON.stringify({v:1,name:$('wname').value,set:S.set,objects:S.objs.map(g=>({id:g.userData.id,type:g.userData.type,name:g.name,visible:g.visible,color:g.userData.color,p:g.position.toArray(),r:[g.rotation.x,g.rotation.y,g.rotation.z],s:g.scale.toArray()}))})}
+function valid(d){return d&&d.v===1&&Array.isArray(d.objects)&&d.objects.length<500&&d.objects.every(o=>o&&T[o.type]&&[o.p,o.r,o.s].every(a=>Array.isArray(a)&&a.length>=3&&a.slice(0,3).every(Number.isFinite)))}
+function load(d){
+ const keep=S.sel&&S.sel.userData.id;[...S.objs].forEach(drop);
+ $('wname').value=String(d.name||'My world').slice(0,40);
+ if(d.set&&typeof d.set==='object')Object.assign(S.set,{sky:/^#[0-9a-f]{6}$/i.test(d.set.sky)?d.set.sky:S.set.sky,gnd:/^#[0-9a-f]{6}$/i.test(d.set.gnd)?d.set.gnd:S.set.gnd,grid:d.set.grid!==false,shadow:d.set.shadow!==false,light:Math.min(2,Math.max(.2,+d.set.light||1))});
+ d.objects.forEach(o=>{const n=parseInt(String(o.id).slice(1));if(n>S.n)S.n=n;addObj(o.type,{...o,id:String(o.id||'o'+(++S.n)),name:String(o.name||T[o.type][1]).slice(0,40)})});
+ applySet();select(S.objs.find(g=>g.userData.id===keep)||null);renderHier()}
+/* ---- history / save ---- */
+function pushHist(){S.undo.push(snap());if(S.undo.length>60)S.undo.shift();S.redo=[]}
+function act(fn){pushHist();fn();markDirty();refreshInsp();renderHier()}
+let saveT;function markDirty(){S.dirty=true;stat();clearTimeout(saveT);saveT=setTimeout(save,700)}
+function save(){try{localStorage.setItem(K,snap());S.dirty=false;stat()}catch(e){toast('Could not save: browser storage is full or blocked.')}}
+function stat(){$('st').innerHTML=`<span>Tool: ${{select:'Select',translate:'Move',rotate:'Rotate',scale:'Scale'}[S.tool]}</span><span>${S.sel?S.sel.name:'Nothing selected'}</span><span>${S.objs.length} objects</span><span>${S.dirty?'Unsaved':'Saved'}</span>`}
+/* ---- selection ---- */
+function select(g){S.sel=g||null;outline.visible=!!g;if(g)outline.setFromObject(g);setTool(S.tool);refreshInsp();renderHier();stat()}
+function setTool(t){S.tool=t;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('on',b.dataset.tool===t));
+ if(t==='select'||!S.sel||!S.sel.visible)tc.detach();else{tc.attach(S.sel);tc.setMode(t)}stat()}
+function pick(){
+ const el=renderer.domElement,ray=new THREE.Raycaster(),v=new THREE.Vector2();let d=null;
+ el.addEventListener('pointerdown',e=>{d=e.isPrimary&&!tc.busy&&!tc.axis?{x:e.clientX,y:e.clientY}:null});
+ el.addEventListener('pointerup',e=>{
+  if(!d||tc.busy||Date.now()-(tc.last||0)<250||Math.hypot(e.clientX-d.x,e.clientY-d.y)>8){d=null;return}d=null;
+  const r=el.getBoundingClientRect();v.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(v,camera);
+  const h=ray.intersectObjects(S.objs.filter(o=>o.visible),true)[0];let o=h&&h.object;while(o&&!S.objs.includes(o))o=o.parent;select(o||null)});
+}
+/* ---- inspector / hierarchy ---- */
+const F={};['pos','rot','scl'].forEach((k,ki)=>{$(k).innerHTML=['X','Y','Z'].map((a,i)=>`<label>${a}<input type="number" step="${k==='rot'?5:.1}" inputmode="decimal" id="${k}${i}"></label>`).join('')});
+function refreshInsp(){const g=S.sel;$('iform').hidden=!g;$('iempty').hidden=!!g;if(!g)return;
+ $('iname').value=g.name;$('itype').textContent='Type: '+T[g.userData.type][1];$('icol').value=g.userData.color;
+ g.position.toArray().forEach((v,i)=>$('pos'+i).value=+v.toFixed(2));[g.rotation.x,g.rotation.y,g.rotation.z].forEach((v,i)=>$('rot'+i).value=Math.round(v*180/Math.PI*10)/10);g.scale.toArray().forEach((v,i)=>$('scl'+i).value=+v.toFixed(2))}
+function readXform(){const g=S.sel;if(!g)return;const n=id=>parseFloat($(id).value),a=[0,1,2];
+ if(![...a.map(i=>n('pos'+i)),...a.map(i=>n('rot'+i)),...a.map(i=>n('scl'+i))].every(Number.isFinite)){toast('Please enter valid numbers.');refreshInsp();return}
+ act(()=>{g.position.set(n('pos0'),n('pos1'),n('pos2'));g.rotation.set(...a.map(i=>n('rot'+i)*Math.PI/180));g.scale.set(...a.map(i=>Math.max(.05,n('scl'+i))))})}
+['pos','rot','scl'].forEach(k=>$(k).addEventListener('change',readXform));
+$('iname').addEventListener('change',e=>{if(S.sel)act(()=>S.sel.name=e.target.value.trim().slice(0,40)||T[S.sel.userData.type][1])});
+$('icol').addEventListener('change',e=>{if(S.sel)act(()=>paint(S.sel,e.target.value))});
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function renderHier(){$('hier').innerHTML=S.objs.length?S.objs.map(g=>`<div class="hi${g===S.sel?' sel':''}" data-sel="${g.userData.id}"><span>${T[g.userData.type][2]}</span><b>${esc(g.name)}</b><button data-vis="${g.userData.id}" aria-label="Toggle visibility">${g.visible?'👁':'🚫'}</button></div>`).join(''):'<div class="empty">Your world is empty. Add something above.</div>'}
+function renderLib(f=''){const cats={};Object.entries(T).forEach(([k,v])=>{if(v[1].toLowerCase().includes(f.toLowerCase()))(cats[v[0]]=cats[v[0]]||[]).push(`<button data-add="${k}">${v[2]} ${v[1]}</button>`)});
+ $('libgrid').innerHTML=Object.entries(cats).map(([c,b])=>`<h3>${c}</h3><div class="grid">${b.join('')}</div>`).join('')||'<div class="empty">No matching objects.</div>'}
+/* ---- settings / camera ---- */
+function applySet(){const s=S.set;scene.background=new THREE.Color(s.sky);scene.fog=new THREE.Fog(s.sky,40,95);ground.material.color.set(s.gnd);grid.visible=s.grid;hemi.intensity=1.6*s.light;sun.intensity=2.4*s.light;sun.castShadow=s.shadow;
+ $('sSky').value=s.sky;$('sGnd').value=s.gnd;$('sGrid').checked=s.grid;$('sShadow').checked=s.shadow;$('sLight').value=s.light}
+[['sSky','sky','value'],['sGnd','gnd','value'],['sGrid','grid','checked'],['sShadow','shadow','checked'],['sLight','light','value']].forEach(([id,k,p])=>$(id).addEventListener('input',e=>{S.set[k]=k==='light'?+e.target[p]:e.target[p];applySet();markDirty()}));
+function view(dir,dist){const t=S.sel?S.sel.position:new THREE.Vector3();controls.target.copy(t);camera.position.copy(t).addScaledVector(dir.normalize(),dist)}
+function zoom(f){camera.position.sub(controls.target).multiplyScalar(f).add(controls.target)}
+/* ---- actions ---- */
+const dl=(blob,name)=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+const need=()=>S.sel||(toast('Select an object first.'),false);
+const ACT={
+ save(){save();toast('Saved in this browser.')},
+ undo(){if(!S.undo.length)return toast('Nothing to undo.');S.redo.push(snap());load(JSON.parse(S.undo.pop()));markDirty()},
+ redo(){if(!S.redo.length)return toast('Nothing to redo.');S.undo.push(snap());load(JSON.parse(S.redo.pop()));markDirty()},
+ new(){if(S.dirty&&!confirm('Start a new world? Unsaved changes will be lost.'))return;S.undo=[];S.redo=[];[...S.objs].forEach(drop);$('wname').value='My new world';Object.assign(S.set,{sky:'#bfe3ff',gnd:'#8fc27e',grid:true,light:1,shadow:true});applySet();renderHier();markDirty()},
+ clear(){if(S.objs.length&&confirm('Remove all objects? You can undo this.'))act(()=>[...S.objs].forEach(drop))},
+ export(){dl(new Blob([snap()],{type:'application/json'}),($('wname').value||'dreamspace').replace(/[^\w-]+/g,'_')+'.json')},
+ import(){$('file').click()},
+ shot(){renderer.render(scene,camera);renderer.domElement.toBlob(b=>b?dl(b,'dreamspace.png'):toast('Screenshot is not supported here.'))},
+ settings(){$('dS').showModal()},help(){$('dH').showModal()},
+ theme(){const t=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=t;try{localStorage.setItem('ds.theme',t)}catch(e){}},
+ dup(){const o=need();if(!o)return;let n;act(()=>{n=addObj(o.userData.type,{name:o.name+' copy',visible:o.visible,color:o.userData.color,p:[o.position.x+.8,o.position.y,o.position.z+.8],r:[o.rotation.x,o.rotation.y,o.rotation.z],s:o.scale.toArray()});});select(n)},
+ reset(){const o=need();if(o)act(()=>{o.position.set(controls.target.x,0,controls.target.z);o.rotation.set(0,0,0);o.scale.set(1,1,1)})},
+ del(){const o=need();if(o){act(()=>drop(o));toast('Deleted. Tap ↶ to undo.')}},
+ desel(){select(null)},
+ cam(){view(new THREE.Vector3(11,9,13),18);controls.target.set(0,0,0);camera.position.set(11,9,13)},
+ top(){view(new THREE.Vector3(0,1,.01),22)},front(){view(new THREE.Vector3(0,.3,1),20)},side(){view(new THREE.Vector3(1,.3,0),20)},
+ zin(){zoom(.8)},zout(){zoom(1.25)},
+ focus(){const o=need();if(o){controls.target.copy(o.position);view(new THREE.Vector3(1,.8,1),9)}},
+ menu(){$('menu').classList.toggle('open')},
+ libt(){$('insp').classList.remove('open');$('lib').classList.toggle('open')},inspt(){$('lib').classList.remove('open');$('insp').classList.toggle('open')}
+};
+document.addEventListener('click',e=>{
+ const a=e.target.closest('[data-act]'),t=e.target.closest('[data-tool]'),ad=e.target.closest('[data-add]'),v=e.target.closest('[data-vis]'),s=e.target.closest('[data-sel]');
+ if(!(a&&a.dataset.act==='menu'))$('menu').classList.remove('open');
+ if(a)ACT[a.dataset.act]();
+ else if(t){if(t.dataset.tool!=='select'&&!S.sel)toast('Select an object first, then drag its handles.');setTool(t.dataset.tool)}
+ else if(ad){let g;act(()=>g=addObj(ad.dataset.add));select(g);toast(T[ad.dataset.add][1]+' added.')}
+ else if(v){const g=S.objs.find(o=>o.userData.id===v.dataset.vis);if(g){act(()=>g.visible=!g.visible);if(S.sel===g)setTool(S.tool)}}
+ else if(s)select(S.objs.find(o=>o.userData.id===s.dataset.sel))});
+$('q').addEventListener('input',e=>renderLib(e.target.value));
+$('wname').addEventListener('change',markDirty);
+$('file').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(!f)return;const r=new FileReader();
+ r.onload=()=>{try{const d=JSON.parse(r.result);if(!valid(d))throw 0;pushHist();load(d);markDirty();toast('World imported.')}catch(x){toast('That file is not a valid DreamSpace world.')}};r.readAsText(f)});
+addEventListener('beforeunload',e=>{if(S.dirty){save()}});
+/* ---- start ---- */
+try{const th=localStorage.getItem('ds.theme');if(th)document.documentElement.dataset.theme=th}catch(e){}
+init();renderLib();
+let loaded=false;try{const raw=localStorage.getItem(K);if(raw){const d=JSON.parse(raw);if(valid(d)){load(d);loaded=true}}}catch(e){toast('Saved world was damaged; starting fresh.')}
+if(!loaded){load({v:1,name:'My first world',objects:[]});[['house',0,0],['tree',-4,-1],['pine',4,-2],['bench',-2,3],['flower',2,3]].forEach(([t,x,z])=>{const g=addObj(t);g.position.set(x,0,z)});renderHier()}
+S.dirty=false;stat();window.__ds=1;
+</script>
+</body>
+</html>
